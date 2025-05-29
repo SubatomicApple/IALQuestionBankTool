@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/IALQuestionBankTool/static/css/main.13f223d2.css",
-    "main.js": "/IALQuestionBankTool/static/js/main.6ec1be55.js",
+    "main.js": "/IALQuestionBankTool/static/js/main.efe78f46.js",
     "index.html": "/IALQuestionBankTool/index.html",
     "main.13f223d2.css.map": "/IALQuestionBankTool/static/css/main.13f223d2.css.map",
-    "main.6ec1be55.js.map": "/IALQuestionBankTool/static/js/main.6ec1be55.js.map"
+    "main.efe78f46.js.map": "/IALQuestionBankTool/static/js/main.efe78f46.js.map"
   },
   "entrypoints": [
     "static/css/main.13f223d2.css",
-    "static/js/main.6ec1be55.js"
+    "static/js/main.efe78f46.js"
   ]
 }
