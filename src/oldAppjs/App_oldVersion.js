@@ -4,26 +4,12 @@ import { Container, Row, Col, Form, Card, Alert, Button } from 'react-bootstrap'
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
-import { auth } from './firebase';
-import { 
-  signInWithEmailAndPassword, 
-  signOut, 
-  createUserWithEmailAndPassword, 
-  onAuthStateChanged 
-} from 'firebase/auth';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`;
 
 function App() {
-  // Authentication states.
-  const [user, setUser] = useState(null);
-  const [loginError, setLoginError] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
-
-  // PDF and CSV data states.
+  // States for CSV data and dropdown options.
   const [availablePdfs, setAvailablePdfs] = useState([]);
   const [units, setUnits] = useState([]);
   const [years, setYears] = useState([]);
@@ -34,71 +20,29 @@ function App() {
   const [selectedUnit, setSelectedUnit] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedQuestion, setSelectedQuestion] = useState('');
-  const [questionTypeFilter, setQuestionTypeFilter] = useState('');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState(''); // if non-empty, will filter dropdown questions by `questionType`
 
   // States for the PDF URLs.
-  const [pdfUrl, setPdfUrl] = useState(null);
-  const [pdfaUrl, setPdfaUrl] = useState(null);
+  const [pdfUrl, setPdfUrl] = useState(null);  // For question view
+  const [pdfaUrl, setPdfaUrl] = useState(null); // For answer view
 
   // Other states.
   const [error, setError] = useState(null);
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [showPdfViewer, setShowPdfViewer] = useState(true);
-
-  // Listen for auth state changes.
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Authentication functions.
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      setEmail('');
-      setPassword('');
-    } catch (err) {
-      setLoginError(err.message);
-    }
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      setEmail('');
-      setPassword('');
-      setIsRegisterMode(false); // Optionally switch back to login mode after successful registration.
-    } catch (err) {
-      setLoginError(err.message);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error("Logout Error: ", err);
-    }
-  };
+  const [showPdfViewer, setShowPdfViewer] = useState(true); // true: question view, false: answer view
 
   // Load and parse the CSV file containing metadata.
   const generatePdfData = () => {
     fetch(`${process.env.PUBLIC_URL}/pdfs.csv`)
       .then((res) => res.text())
       .then((text) => {
-        const lines = text.split('\n').filter((line) => line.trim().length > 0);
+        const lines = text.split('\n').filter(line => line.trim().length > 0);
         // Assumes the CSV header is:
         // unit,year,type,question,fileName,questionType
-        const header = lines[0].split(',').map((item) => item.trim());
-        const data = lines.slice(1).map((line) => {
+        const header = lines[0].split(',').map(item => item.trim());
+        const data = lines.slice(1).map(line => {
           const parts = line.split(',');
           const record = {};
           header.forEach((h, idx) => {
@@ -110,10 +54,10 @@ function App() {
         setAvailablePdfs(data);
 
         // Generate dropdown options from CSV.
-        const uniqueUnits = [...new Set(data.map((pdf) => pdf.unit))].sort();
-        const uniqueYears = [...new Set(data.map((pdf) => pdf.year))].sort().reverse();
-        const uniqueQuestions = [...new Set(data.map((pdf) => pdf.question))].sort();
-        const uniqueQuestionTypes = [...new Set(data.map((pdf) => pdf.questionType))].sort();
+        const uniqueUnits = [...new Set(data.map(pdf => pdf.unit))].sort();
+        const uniqueYears = [...new Set(data.map(pdf => pdf.year))].sort().reverse();
+        const uniqueQuestions = [...new Set(data.map(pdf => pdf.question))].sort();
+        const uniqueQuestionTypes = [...new Set(data.map(pdf => pdf.questionType))].sort();
 
         setUnits(uniqueUnits);
         setYears(uniqueYears);
@@ -129,30 +73,32 @@ function App() {
   };
 
   useEffect(() => {
-    if (user) {
-      generatePdfData();
-    }
-  }, [user]);
+    generatePdfData();
+  }, []);
 
   // This effect updates the displayed PDF when selections or view mode change.
   useEffect(() => {
+    // Proceed only if unit, year, and question have been selected.
     if (selectedUnit && selectedYear && selectedQuestion) {
       let match;
+
+      // When in Question view, find a record whose type is "Q".
       if (showPdfViewer) {
         match = availablePdfs.find(
-          (pdf) =>
+          pdf =>
             pdf.unit === selectedUnit &&
             pdf.year === selectedYear &&
             pdf.question === selectedQuestion &&
-            pdf.type === 'Q'
+            pdf.type === "Q"
         );
       } else {
+        // In Answer view, look for a record whose type is "A".
         match = availablePdfs.find(
-          (pdf) =>
+          pdf =>
             pdf.unit === selectedUnit &&
             pdf.year === selectedYear &&
             pdf.question === selectedQuestion &&
-            pdf.type === 'A'
+            pdf.type === "A"
         );
       }
 
@@ -160,21 +106,18 @@ function App() {
         const fileUrl = `${process.env.PUBLIC_URL}/pdfs/${match.fileName}.pdf`;
         if (showPdfViewer) {
           setPdfUrl(fileUrl);
-          setPdfaUrl(`${process.env.PUBLIC_URL}/pdfs/${match.fileName.replace('_Q_', '_A_')}.pdf`);
+          // Also store an answer URL (by replacing Q with A) if available.
+          setPdfaUrl(`${process.env.PUBLIC_URL}/pdfs/${match.fileName.replace("_Q_", "_A_")}.pdf`);
           setError(null);
         } else {
           setPdfaUrl(fileUrl);
           setError(null);
         }
-        setPageNumber(1);
+        setPageNumber(1); // Reset page number when selection changes.
       } else {
         setPdfUrl(null);
         setPdfaUrl(null);
-        setError(
-          `PDF not available for ${selectedUnit} ${selectedYear} ${
-            showPdfViewer ? 'Question' : 'Answer'
-          } ${selectedQuestion}.`
-        );
+        setError(`PDF not available for ${selectedUnit} ${selectedYear} ${showPdfViewer ? "Question" : "Answer"} ${selectedQuestion}.`);
       }
     }
   }, [selectedUnit, selectedYear, selectedQuestion, availablePdfs, showPdfViewer]);
@@ -196,19 +139,21 @@ function App() {
     setQuestionTypeFilter(e.target.value);
   };
 
-  // Filter questions based on selected criteria.
+  // When the user clicks "Filter Questions", update the questions dropdown based on
+  // selected unit, year, and the additional `questionType` column.
   const applyFilter = () => {
     let filtered = availablePdfs;
     if (selectedUnit) {
-      filtered = filtered.filter((pdf) => pdf.unit === selectedUnit);
+      filtered = filtered.filter(pdf => pdf.unit === selectedUnit);
     }
     if (selectedYear) {
-      filtered = filtered.filter((pdf) => pdf.year === selectedYear);
+      filtered = filtered.filter(pdf => pdf.year === selectedYear);
     }
+    // Use the new "questionType" column for filtering when provided.
     if (questionTypeFilter) {
-      filtered = filtered.filter((pdf) => pdf.questionType === questionTypeFilter);
+      filtered = filtered.filter(pdf => pdf.questionType === questionTypeFilter);
     }
-    const filteredUniqueQuestions = [...new Set(filtered.map((pdf) => pdf.question))].sort();
+    const filteredUniqueQuestions = [...new Set(filtered.map(pdf => pdf.question))].sort();
     setQuestions(filteredUniqueQuestions);
   };
 
@@ -228,78 +173,12 @@ function App() {
 
   const toggleView = () => {
     setShowPdfViewer((prevState) => !prevState);
+    // Clear any previous error when toggling view.
     setError(null);
   };
 
-  // Render the login/registration form if no user is authenticated.
-  if (!user) {
-    return (
-      <Container className="mt-4">
-        <Row className="justify-content-md-center">
-          <Col md={6}>
-            <Card className="shadow-sm">
-              <Card.Header className="bg-primary text-white">
-                <h2>{isRegisterMode ? 'Register' : 'Login'}</h2>
-              </Card.Header>
-              <Card.Body>
-                {loginError && <Alert variant="danger">{loginError}</Alert>}
-                <Form onSubmit={isRegisterMode ? handleRegister : handleLogin}>
-                  <Form.Group className="mb-3" controlId="formEmail">
-                    <Form.Label>Email address</Form.Label>
-                    <Form.Control
-                      type="email"
-                      placeholder="Enter email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </Form.Group>
-
-                  <Form.Group className="mb-3" controlId="formPassword">
-                    <Form.Label>Password</Form.Label>
-                    <Form.Control
-                      type="password"
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </Form.Group>
-
-                  <Button variant="primary" type="submit">
-                    {isRegisterMode ? 'Register' : 'Login'}
-                  </Button>
-                </Form>
-                <div className="mt-3">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setIsRegisterMode((prev) => !prev);
-                      setLoginError('');
-                    }}
-                    size="sm"
-                  >
-                    {isRegisterMode ? 'Already have an account? Login' : "Don't have an account? Register"}
-                  </Button>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
-    );
-  }
-
-  // Render the main PDF viewer interface if the user is authenticated.
   return (
     <Container className="mt-4 mb-4">
-      <Row className="mb-3">
-        <Col className="text-end">
-          <Button variant="danger" onClick={handleLogout}>
-            Logout
-          </Button>
-        </Col>
-      </Row>
       <Card className="shadow-sm">
         <Card.Header className="bg-primary text-white">
           <h2>IAL Physics PastPaper 2020-2023</h2>
@@ -309,12 +188,14 @@ function App() {
             <Col md={4}>
               <Form.Group>
                 <Form.Label>Unit:</Form.Label>
-                <Form.Select value={selectedUnit} onChange={handleUnitChange} disabled={loading}>
+                <Form.Select 
+                  value={selectedUnit} 
+                  onChange={handleUnitChange}
+                  disabled={loading}
+                >
                   <option value="">Select Unit</option>
-                  {units.map((unit) => (
-                    <option key={unit} value={unit}>
-                      {unit}
-                    </option>
+                  {units.map(unit => (
+                    <option key={unit} value={unit}>{unit}</option>
                   ))}
                 </Form.Select>
               </Form.Group>
@@ -322,12 +203,14 @@ function App() {
             <Col md={4}>
               <Form.Group>
                 <Form.Label>Year:</Form.Label>
-                <Form.Select value={selectedYear} onChange={handleYearChange} disabled={loading}>
+                <Form.Select 
+                  value={selectedYear} 
+                  onChange={handleYearChange}
+                  disabled={loading}
+                >
                   <option value="">Select Year</option>
-                  {years.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
+                  {years.map(year => (
+                    <option key={year} value={year}>{year}</option>
                   ))}
                 </Form.Select>
               </Form.Group>
@@ -335,32 +218,33 @@ function App() {
             <Col md={4}>
               <Form.Group>
                 <Form.Label>Question:</Form.Label>
-                <Form.Select value={selectedQuestion} onChange={handleQuestionChange} disabled={loading}>
+                <Form.Select 
+                  value={selectedQuestion} 
+                  onChange={handleQuestionChange}
+                  disabled={loading}
+                >
                   <option value="">Select Question</option>
-                  {questions.map((question) => (
-                    <option key={question} value={question}>
-                      {question}
-                    </option>
+                  {questions.map(question => (
+                    <option key={question} value={question}>{question}</option>
                   ))}
                 </Form.Select>
               </Form.Group>
             </Col>
           </Row>
-
+          
+          {/* New row for filtering questions by questionType */}
           <Row className="mb-3">
             <Col md={4}>
               <Form.Group>
                 <Form.Label>Question Type Filter:</Form.Label>
-                <Form.Select
-                  value={questionTypeFilter}
+                <Form.Select 
+                  value={questionTypeFilter} 
                   onChange={handleQuestionTypeFilterChange}
                   disabled={loading}
                 >
                   <option value="">All</option>
-                  {questionTypes.map((qType) => (
-                    <option key={qType} value={qType}>
-                      {qType}
-                    </option>
+                  {questionTypes.map(qType => (
+                    <option key={qType} value={qType}>{qType}</option>
                   ))}
                 </Form.Select>
               </Form.Group>
@@ -375,7 +259,7 @@ function App() {
           <Row className="mb-3">
             <Col>
               <Button variant="primary" onClick={toggleView}>
-                {showPdfViewer ? 'Show Answers' : 'Show Questions'}
+                {showPdfViewer ? "Show Answers" : "Show Questions"}
               </Button>
             </Col>
           </Row>
@@ -385,16 +269,24 @@ function App() {
 
           <div className="pdf-container">
             {showPdfViewer ? (
-              pdfUrl ? (
+              pdfUrl ? ( // Question view
                 <>
                   <div className="pdf-controls mb-2">
-                    <Button variant="secondary" onClick={previousPage} disabled={pageNumber <= 1}>
+                    <Button 
+                      variant="secondary" 
+                      onClick={previousPage} 
+                      disabled={pageNumber <= 1}
+                    >
                       Previous
                     </Button>
                     <span className="mx-2">
                       Page {pageNumber} of {numPages || '--'}
                     </span>
-                    <Button variant="secondary" onClick={nextPage} disabled={pageNumber >= numPages}>
+                    <Button 
+                      variant="secondary" 
+                      onClick={nextPage} 
+                      disabled={pageNumber >= numPages}
+                    >
                       Next
                     </Button>
                   </div>
@@ -404,8 +296,8 @@ function App() {
                     onLoadError={(error) => setError(`Error loading PDF: ${error.message}`)}
                     loading={<div className="text-center p-5">Loading PDF...</div>}
                   >
-                    <Page
-                      pageNumber={pageNumber}
+                    <Page 
+                      pageNumber={pageNumber} 
                       renderTextLayer={false}
                       renderAnnotationLayer={false}
                       scale={1.2}
@@ -420,16 +312,24 @@ function App() {
                   </div>
                 )
               )
-            ) : (
+            ) : ( // Answer view
               <>
-                <div className="pdf-controls mb-2">
-                  <Button variant="secondary" onClick={previousPage} disabled={pageNumber <= 1}>
+                <div className="pdf-controls mb-2"> 
+                  <Button 
+                    variant="secondary" 
+                    onClick={previousPage} 
+                    disabled={pageNumber <= 1}
+                  >
                     Previous
                   </Button>
                   <span className="mx-2">
                     Page {pageNumber} of {numPages || '--'}
                   </span>
-                  <Button variant="secondary" onClick={nextPage} disabled={pageNumber >= numPages}>
+                  <Button 
+                    variant="secondary" 
+                    onClick={nextPage} 
+                    disabled={pageNumber >= numPages}
+                  >
                     Next
                   </Button>
                 </div>
@@ -440,8 +340,8 @@ function App() {
                     onLoadError={(error) => setError(`Error loading PDF: ${error.message}`)}
                     loading={<div className="text-center p-5">Loading PDF...</div>}
                   >
-                    <Page
-                      pageNumber={pageNumber}
+                    <Page 
+                      pageNumber={pageNumber} 
                       renderTextLayer={false}
                       renderAnnotationLayer={false}
                       scale={1.2}
