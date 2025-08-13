@@ -461,6 +461,7 @@
 // App.js
 // App.js
 // App.js
+// App.js
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Form, Card, Alert, Button } from 'react-bootstrap';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -597,7 +598,8 @@ function App() {
     if (availablePdfs.length > 0 && selectedUnit && selectedYear) {
       const filtered = availablePdfs.filter(pdf => pdf.unit === selectedUnit && pdf.year === selectedYear);
       // Update Question dropdown: extract questions and sort numerically ascending.
-      const filteredQuestions = [...new Set(filtered.map(pdf => pdf.question))].sort((a, b) => Number(a) - Number(b));
+      const filteredQuestions = [...new Set(filtered.map(pdf => pdf.question))]
+        .sort((a, b) => Number(a) - Number(b));
       setQuestions(filteredQuestions);
       setSelectedQuestion('');
 
@@ -635,11 +637,13 @@ function App() {
       }
 
       if (match) {
-        const fileUrl = `${process.env.PUBLIC_URL}/pdfs/${match.fileName}.pdf`;
+        // Build the URL using the unit folder.
+        const fileUrl = `${process.env.PUBLIC_URL}/pdfs/${match.unit}/${match.fileName}.pdf`;
         if (showPdfViewer) {
           setPdfUrl(fileUrl);
           // Also store an answer URL (by replacing Q with A) if available.
-          setPdfaUrl(`${process.env.PUBLIC_URL}/pdfs/${match.fileName.replace("_Q_", "_A_")}.pdf`);
+          const altUrl = `${process.env.PUBLIC_URL}/pdfs/${match.unit}/${match.fileName.replace("_Q_", "_A_")}.pdf`;
+          setPdfaUrl(altUrl);
           setError(null);
         } else {
           setPdfaUrl(fileUrl);
@@ -682,7 +686,8 @@ function App() {
       if (questionTypeFilter) {
         filtered = filtered.filter(pdf => pdf.questionType === questionTypeFilter);
       }
-      const filteredUniqueQuestions = [...new Set(filtered.map(pdf => pdf.question))].sort((a, b) => Number(a) - Number(b));
+      const filteredUniqueQuestions = [...new Set(filtered.map(pdf => pdf.question))]
+        .sort((a, b) => Number(a) - Number(b));
       setQuestions(filteredUniqueQuestions);
       setSelectedQuestion('');
     }
