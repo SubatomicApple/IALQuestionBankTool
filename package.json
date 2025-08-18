@@ -1,5 +1,4 @@
 {
-  "homepage": "http://SubatomicApple.github.io/IALQuestionBankTool",
   "name": "pdf-viewer",
   "version": "0.1.0",
   "private": true,
@@ -27,9 +26,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "server": "node server.js",
-    "dev": "concurrently \"npm run start\" \"npm run server\"",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "dev": "concurrently \"npm run start\" \"npm run server\""
   },
   "eslintConfig": {
     "extends": [
@@ -49,8 +46,5 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:3001",
-  "devDependencies": {
-    "gh-pages": "^6.3.0"
-  }
+  "proxy": "http://localhost:3001"
 }
